@@ -5,16 +5,87 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section(header: PTSectionHeader(title: "Organization")) {
+                    NavigationLink("Organization") { OrganizationSettingsView() }
+                }
                 Section(header: PTSectionHeader(title: "Manage")) {
                     NavigationLink("Classrooms") { SettingsClassroomsView() }
                     NavigationLink("Students") { SettingsStudentsView() }
                     NavigationLink("Guides") { SettingsGuidesView() }
+                    NavigationLink("AI Settings") { AISettingsView() }
                 }
             }
             .navigationTitle("Settings")
         }
     }
 }
+struct OrganizationSettingsView: View {
+    @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var appVM: AppViewModel
+    private let orgs: OrgServiceProtocol = OrgService()
+    private let invites: InviteServiceProtocol = InviteService()
+    private let memberships: MembershipServiceProtocol = MembershipService()
+    @State private var orgName: String = ""
+    @State private var inviteRole: OrgRole = .guide
+    @State private var lastInviteCode: String?
+    @State private var redeemCode: String = ""
+
+    var body: some View {
+        Form {
+            Section(header: PTSectionHeader(title: "Organization")) {
+                TextField("Name", text: $orgName)
+                Button("Save name") { saveName() }
+            }
+            Section(header: PTSectionHeader(title: "Invite")) {
+                Picker("Role", selection: $inviteRole) {
+                    ForEach(OrgRole.allCases) { r in Text(r.rawValue).tag(r) }
+                }
+                Button("Create invite") { createInvite() }.ptPrimary()
+                if let code = lastInviteCode { Text("Invite code: \(code)").font(PTTypography.caption) }
+            }
+            Section(header: PTSectionHeader(title: "Join")) {
+                TextField("Enter invite code", text: $redeemCode)
+                Button("Redeem") { redeem() }
+            }
+        }
+        .navigationTitle("Organization")
+        .onAppear { loadOrgName() }
+    }
+
+    private func loadOrgName() {
+        guard let guide = appVM.currentGuide, let orgId = try? sessionOrgId(guide) else { return }
+        if let org = try? modelContext.fetch(FetchDescriptor<Organization>(predicate: #Predicate { $0.id == orgId })).first {
+            orgName = org.name
+        }
+    }
+
+    private func saveName() {
+        guard let guide = appVM.currentGuide, let orgId = try? sessionOrgId(guide) else { return }
+        if let org = try? modelContext.fetch(FetchDescriptor<Organization>(predicate: #Predicate { $0.id == orgId })).first {
+            try? orgs.rename(org, to: orgName, context: modelContext)
+        }
+    }
+
+    private func createInvite() {
+        guard let guide = appVM.currentGuide, let orgId = try? sessionOrgId(guide) else { return }
+        if let inv = try? invites.create(orgId: orgId, role: inviteRole, createdBy: guide.id, context: modelContext) {
+            lastInviteCode = inv.code
+        }
+    }
+
+    private func redeem() {
+        guard let guide = appVM.currentGuide else { return }
+        _ = try? invites.redeem(code: redeemCode.trimmingCharacters(in: .whitespacesAndNewlines), by: guide.id, context: modelContext)
+    }
+
+    private func sessionOrgId(_ guide: Guide) throws -> UUID? {
+        let gid = guide.id
+        var descriptor = FetchDescriptor<Membership>(predicate: #Predicate { $0.guideId == gid })
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first?.orgId
+    }
+}
+
 
 struct SettingsClassroomsView: View {
     @Environment(\.modelContext) private var modelContext
@@ -29,13 +100,13 @@ struct SettingsClassroomsView: View {
             ForEach(classrooms) { room in
                 NavigationLink(destination: ClassroomDetailView(classroom: room)) {
                     HStack {
-                        PTAvatar(initials: initials(for: room.name), size: 28)
+                        PTAvatar(image: nil, size: 28, initials: initials(for: room.name))
                         Text(room.name)
                     }
                 }
             }
             .onDelete { idx in
-                guard let guide = appVM.currentGuide, permission.canManageClassrooms(guide) else { return }
+                guard let guide = appVM.currentGuide, permission.canManageClassrooms(guide, orgRole: currentOrgRole()) else { return }
                 for i in idx { try? classroomService.delete(classrooms[i], context: modelContext) }
             }
         }
@@ -47,7 +118,7 @@ struct SettingsClassroomsView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
-            if let guide = appVM.currentGuide, permission.canManageClassrooms(guide) {
+            if let guide = appVM.currentGuide, permission.canManageClassrooms(guide, orgRole: currentOrgRole()) {
                 Button { showCreate = true } label: { Image(systemName: "plus") }
             }
         }
@@ -74,11 +145,19 @@ struct ClassroomDetailView: View {
         .navigationTitle("Classroom")
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                if let guide = appVM.currentGuide, permission.canManageClassrooms(guide) {
+                if let guide = appVM.currentGuide, permission.canManageClassrooms(guide, orgRole: currentOrgRole()) {
                     Button("Save") { try? classroomService.update(classroom, name: name, imageURL: nil, context: modelContext) }
                 }
             }
         }
+    }
+
+    private func currentOrgRole() -> OrgRole? {
+        guard let guide = appVM.currentGuide else { return nil }
+        let gid = guide.id
+        var descriptor = FetchDescriptor<Membership>(predicate: #Predicate { $0.guideId == gid })
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first?.role
     }
 }
 
@@ -95,13 +174,13 @@ struct SettingsStudentsView: View {
             ForEach(students) { student in
                 NavigationLink(destination: StudentDetailView(student: student)) {
                     HStack(spacing: PTSpacing.m.rawValue) {
-                        PTAvatar(initials: initials(for: student.displayName), size: 28)
+                        PTAvatar(image: nil, size: 28, initials: initials(for: student.displayName))
                         Text(student.displayName)
                     }
                 }
             }
             .onDelete { idx in
-                guard let guide = appVM.currentGuide, permission.canManageStudents(guide) else { return }
+                guard let guide = appVM.currentGuide, permission.canManageStudents(guide, orgRole: currentOrgRole()) else { return }
                 for i in idx { try? studentService.delete(students[i], context: modelContext) }
             }
         }
@@ -113,7 +192,7 @@ struct SettingsStudentsView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
-            if let guide = appVM.currentGuide, permission.canManageStudents(guide) {
+            if let guide = appVM.currentGuide, permission.canManageStudents(guide, orgRole: currentOrgRole()) {
                 Button { showCreate = true } label: { Image(systemName: "plus") }
             }
         }
@@ -182,11 +261,19 @@ struct StudentDetailView: View {
         .navigationTitle("Student")
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                if let guide = appVM.currentGuide, permission.canManageStudents(guide) {
+                if let guide = appVM.currentGuide, permission.canManageStudents(guide, orgRole: currentOrgRole()) {
                     Button("Save") { try? studentService.update(student, firstName: firstName, lastName: lastName, imageURL: nil, notes: notes, context: modelContext) }
                 }
             }
         }
+    }
+
+    private func currentOrgRole() -> OrgRole? {
+        guard let guide = appVM.currentGuide else { return nil }
+        let gid = guide.id
+        var descriptor = FetchDescriptor<Membership>(predicate: #Predicate { $0.guideId == gid })
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first?.role
     }
 }
 
@@ -202,7 +289,7 @@ struct SettingsGuidesView: View {
             ForEach(guides) { guide in
                 NavigationLink(destination: GuideDetailView(guide: guide)) {
                     HStack(spacing: PTSpacing.m.rawValue) {
-                        PTAvatar(initials: initials(for: guide.fullName), size: 28)
+                        PTAvatar(image: nil, size: 28, initials: initials(for: guide.fullName))
                         Text(guide.fullName)
                         Spacer()
                         Text(guide.role.rawValue)
@@ -212,7 +299,7 @@ struct SettingsGuidesView: View {
                 }
             }
             .onDelete { idx in
-                guard let current = appVM.currentGuide, permission.canManageGuides(current) else { return }
+                guard let current = appVM.currentGuide, permission.canManageGuides(current, orgRole: currentOrgRole()) else { return }
                 for i in idx { try? guideService.delete(guides[i], context: modelContext) }
             }
         }
@@ -254,11 +341,65 @@ struct GuideDetailView: View {
         .navigationTitle("Guide")
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                if let current = appVM.currentGuide, permission.canManageGuides(current) {
+                if let current = appVM.currentGuide, permission.canManageGuides(current, orgRole: currentOrgRole()) {
                     Button("Save") { try? guideService.update(guide, fullName: fullName, email: email.isEmpty ? nil : email, role: role, defaultClassroomId: guide.defaultClassroomId, context: modelContext) }
                 }
             }
         }
+    }
+
+    private func currentOrgRole() -> OrgRole? {
+        guard let guide = appVM.currentGuide else { return nil }
+        let gid = guide.id
+        var descriptor = FetchDescriptor<Membership>(predicate: #Predicate { $0.guideId == gid })
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first?.role
+    }
+}
+
+private extension SettingsClassroomsView {
+    func currentOrgRole() -> OrgRole? {
+        guard let guide = appVM.currentGuide else { return nil }
+        let gid = guide.id
+        var descriptor = FetchDescriptor<Membership>(predicate: #Predicate { $0.guideId == gid })
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first?.role
+    }
+}
+
+private extension SettingsStudentsView {
+    func currentOrgRole() -> OrgRole? {
+        guard let guide = appVM.currentGuide else { return nil }
+        let gid = guide.id
+        var descriptor = FetchDescriptor<Membership>(predicate: #Predicate { $0.guideId == gid })
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first?.role
+    }
+}
+
+private extension SettingsGuidesView {
+    func currentOrgRole() -> OrgRole? {
+        guard let guide = appVM.currentGuide else { return nil }
+        let gid = guide.id
+        var descriptor = FetchDescriptor<Membership>(predicate: #Predicate { $0.guideId == gid })
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first?.role
+    }
+}
+
+struct AISettingsView: View {
+    @State private var apiKey: String = ""
+    private let config: ConfigServiceProtocol = ConfigService()
+
+    var body: some View {
+        Form {
+            Section(header: PTSectionHeader(title: "OpenAI")) {
+                SecureField("API Key", text: $apiKey)
+                Button("Save") { config.setOpenAIAPIKey(apiKey) }.ptPrimary()
+            }
+        }
+        .onAppear { apiKey = config.openAIAPIKey() ?? "" }
+        .navigationTitle("AI Settings")
     }
 }
 

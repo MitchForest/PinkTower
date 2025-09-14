@@ -5,6 +5,9 @@ struct HomeroomView: View {
     @EnvironmentObject private var appVM: AppViewModel
     @Environment(\.modelContext) private var modelContext
     @Query private var students: [Student]
+    @State private var showCreateStudent = false
+    @State private var showStudentSheet = false
+    @State private var selectedStudent: Student?
 
     init() {
         // Query will be adjusted at runtime via filter when we have a classroom id
@@ -12,19 +15,48 @@ struct HomeroomView: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: PTSpacing.l.rawValue)], spacing: PTSpacing.l.rawValue) {
-                ForEach(filteredStudents()) { student in
-                    VStack(spacing: PTSpacing.s.rawValue) {
-                        PTAvatar(initials: initials(for: student.displayName), size: 64)
-                        Text(student.displayName)
-                            .font(PTTypography.body)
-                            .foregroundStyle(PTColors.textPrimary)
+        FloatingActionButtonContainer(content: {
+            if filteredStudents().isEmpty {
+                PTEmptyState(
+                    title: "Add your first student",
+                    message: "Students appear here for quick access.",
+                    primaryTitle: "Add student",
+                    primaryAction: { showCreateStudent = true }
+                )
+            } else {
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: PTSpacing.l.rawValue)], spacing: PTSpacing.l.rawValue) {
+                        ForEach(filteredStudents()) { student in
+                            Button(action: {
+                                selectedStudent = student
+                                showStudentSheet = true
+                            }) {
+                                VStack(spacing: PTSpacing.s.rawValue) {
+                                    PTAvatar(image: nil, size: 64, initials: initials(for: student.displayName))
+                                    Text(student.displayName)
+                                        .font(PTTypography.body)
+                                        .foregroundStyle(PTColors.textPrimary)
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                            .contextMenu {
+                                Button("Edit") { /* future edit */ }
+                                Button("Delete", role: .destructive) { /* gated delete */ }
+                            }
+                        }
                     }
-                    .frame(maxWidth: .infinity)
+                    .padding(PTSpacing.l.rawValue)
                 }
             }
-            .padding(PTSpacing.l.rawValue)
+        }, button: PTFloatingActionButton(systemImage: "plus", action: { showCreateStudent = true }))
+        .ptBottomSheet(isPresented: $showStudentSheet) {
+            if let selectedStudent = selectedStudent {
+                StudentPageView(student: selectedStudent)
+            }
+        }
+        .sheet(isPresented: $showCreateStudent) {
+            CreateStudentSheet(onCreated: { _ in Haptics.success() })
+                .accessibilityElement(children: .contain)
         }
         .background(PTColors.surface)
     }

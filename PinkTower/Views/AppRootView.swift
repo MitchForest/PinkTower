@@ -11,8 +11,14 @@ struct AppRootView: View {
                 SignInView()
                     .onAppear { appVM.bootstrap(context: modelContext) }
                     .environmentObject(appVM)
+            case .promptCreateOrganization:
+                OnboardingWizardView()
+                    .environmentObject(appVM)
+            case .promptJoinOrganization:
+                JoinOrganizationView()
+                    .environmentObject(appVM)
             case .promptCreateClassroom:
-                CreateClassroomPromptView()
+                OnboardingWizardView()
                     .environmentObject(appVM)
             case .main:
                 MainTabView()

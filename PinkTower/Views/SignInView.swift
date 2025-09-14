@@ -12,7 +12,7 @@ struct SignInView: View {
         let auth = AuthService()
         let session = SessionService()
         // modelContext will be set after init; we will reinit in body
-        _vm = StateObject(wrappedValue: SignInViewModel(authService: auth, sessionService: session, modelContext: ModelContext(try! ModelContainer(for: Item.self))))
+        _vm = StateObject(wrappedValue: SignInViewModel(authService: auth, sessionService: session))
     }
 
     var body: some View {
@@ -26,7 +26,7 @@ struct SignInView: View {
             }
             .multilineTextAlignment(.center)
 
-            SignInWithAppleButton(.signIn, onRequest: { request in
+            PTAppleSignInButton(onRequest: { request in
                 request.requestedScopes = [.fullName, .email]
             }, onCompletion: { result in
                 switch result {
@@ -36,9 +36,7 @@ struct SignInView: View {
                     vm.errorMessage = error.localizedDescription
                 }
             })
-            .signInWithAppleButtonStyle(.black)
-            .frame(height: 50)
-            .clipShape(RoundedRectangle(cornerRadius: PTRadius.m.rawValue, style: .continuous))
+            .frame(maxWidth: 400, minHeight: 56, maxHeight: 56)
             .padding(.horizontal, PTSpacing.xl.rawValue)
             .overlay(alignment: .center) {
                 if vm.isLoading { ProgressView() }
@@ -50,15 +48,12 @@ struct SignInView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(PTColors.surface)
         .task {
-            // rebuild vm with real context once available
+            // Provide the real context and callback once available
+            vm.setModelContext(modelContext)
             if vm.onSignedIn == nil {
-                let auth = AuthService()
-                let session = SessionService()
-                let newVM = SignInViewModel(authService: auth, sessionService: session, modelContext: modelContext)
-                newVM.onSignedIn = { route in
+                vm.onSignedIn = { route in
                     appVM.handleSignedIn(context: modelContext, newRoute: route)
                 }
-                _vm.wrappedValue = newVM
             }
         }
     }

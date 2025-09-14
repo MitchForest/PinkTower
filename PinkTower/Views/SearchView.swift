@@ -12,9 +12,11 @@ struct SearchView: View {
     var body: some View {
         NavigationStack {
             List(filtered()) { student in
-                HStack(spacing: PTSpacing.m.rawValue) {
-                    PTAvatar(initials: initials(for: student.displayName), size: 32)
-                    Text(student.displayName)
+                NavigationLink(destination: StudentPageView(student: student)) {
+                    HStack(spacing: PTSpacing.m.rawValue) {
+                        PTAvatar(image: nil, size: 32, initials: initials(for: student.displayName))
+                        Text(student.displayName)
+                    }
                 }
             }
             .searchable(text: $query)

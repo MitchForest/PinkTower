@@ -2,34 +2,38 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject private var appVM: AppViewModel
+    @State private var selectedTab: Int = 0
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
+            ClassroomsView()
+                .tabItem { Label("Classrooms", systemImage: "building.2") }
+                .tag(0)
             HomeroomView()
-                .tabItem { Label("Homeroom", systemImage: "person.3") }
+                .tabItem { Label("Students", systemImage: "person.3") }
+                .tag(1)
             MyDayView()
                 .tabItem { Label("My Day", systemImage: "sun.max") }
+                .tag(2)
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gearshape") }
+                .tag(3)
             SearchView()
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
+                .tag(4)
         }
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Text("Pink Tower").font(PTTypography.subtitle).foregroundStyle(PTColors.textSecondary)
-            }
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                NavigationLink(destination: NotificationsView()) {
-                    Image(systemName: "bell")
-                }
-                Menu {
-                    Button("Profile", action: {})
-                    Button("Switch classroom", action: {})
-                    Button("Sign out", role: .destructive) { appVM.signOut() }
-                } label: {
-                    PTAvatar(initials: initials(for: appVM.currentGuide?.fullName ?? "G"), size: 28)
-                }
-            }
+        .safeAreaInset(edge: .top, content: {
+            PTTopBarCapsule(
+                title: appVM.selectedClassroomId == nil ? "Pink Tower" : "Classroom",
+                onSearch: {},
+                onNotifications: {},
+                onAvatar: {}
+            )
+            .accessibilityAddTraits(.isHeader)
+        })
+        .onAppear {
+            // If we already have a selected classroom (single-classroom case), land on Students
+            if appVM.selectedClassroomId != nil { selectedTab = 1 } else { selectedTab = 0 }
         }
     }
 

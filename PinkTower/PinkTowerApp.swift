@@ -16,6 +16,15 @@ struct PinkTowerApp: App {
             Guide.self,
             Classroom.self,
             Student.self,
+            Organization.self,
+            Membership.self,
+            Invite.self,
+            StudentObservation.self,
+            Habit.self,
+            HabitLog.self,
+            Lesson.self,
+            TaskItem.self,
+            ParentContact.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

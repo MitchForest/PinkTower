@@ -7,6 +7,7 @@ enum PTSpacing: CGFloat {
     case l = 16
     case xl = 24
     case xxl = 32
+    case xxxl = 48
 }
 
 

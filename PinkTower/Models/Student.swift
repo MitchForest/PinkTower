@@ -4,6 +4,7 @@ import SwiftData
 @Model
 final class Student {
     var id: UUID
+    var orgId: UUID?
     var firstName: String
     var lastName: String
     var displayName: String
@@ -14,6 +15,7 @@ final class Student {
     init(
         id: UUID = UUID(),
         firstName: String,
+        orgId: UUID? = nil,
         lastName: String,
         displayName: String? = nil,
         imageURL: String? = nil,
@@ -21,6 +23,7 @@ final class Student {
         notes: String? = nil
     ) {
         self.id = id
+        self.orgId = orgId
         self.firstName = firstName
         self.lastName = lastName
         self.displayName = displayName ?? "\(firstName) \(lastName)"
