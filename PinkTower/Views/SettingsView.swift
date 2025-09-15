@@ -14,8 +14,13 @@ struct SettingsView: View {
                     NavigationLink("Guides") { SettingsGuidesView() }
                     NavigationLink("AI Settings") { AISettingsView() }
                 }
+                Section(header: PTSectionHeader(title: "Developer Tools")) {
+                    NavigationLink("Developer Tools") { DeveloperToolsView() }
+                }
             }
             .navigationTitle("Settings")
+            .scrollContentBackground(.hidden)
+            .background(PTColors.surface)
         }
     }
 }
@@ -33,21 +38,23 @@ struct OrganizationSettingsView: View {
     var body: some View {
         Form {
             Section(header: PTSectionHeader(title: "Organization")) {
-                TextField("Name", text: $orgName)
-                Button("Save name") { saveName() }
+                TextField("Name", text: $orgName).textFieldStyle(PTTextFieldStyle())
+                Button("Save name") { saveName() }.ptPrimary()
             }
             Section(header: PTSectionHeader(title: "Invite")) {
                 Picker("Role", selection: $inviteRole) {
                     ForEach(OrgRole.allCases) { r in Text(r.rawValue).tag(r) }
                 }
                 Button("Create invite") { createInvite() }.ptPrimary()
-                if let code = lastInviteCode { Text("Invite code: \(code)").font(PTTypography.caption) }
+                if let code = lastInviteCode { Text("Invite code: \(code)").font(PTTypography.caption).foregroundStyle(PTColors.textSecondary) }
             }
             Section(header: PTSectionHeader(title: "Join")) {
-                TextField("Enter invite code", text: $redeemCode)
-                Button("Redeem") { redeem() }
+                TextField("Enter invite code", text: $redeemCode).textFieldStyle(PTTextFieldStyle())
+                Button("Redeem") { redeem() }.ptSecondary()
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(PTColors.surface)
         .navigationTitle("Organization")
         .onAppear { loadOrgName() }
     }
@@ -138,9 +145,11 @@ struct ClassroomDetailView: View {
     var body: some View {
         Form {
             Section(header: PTSectionHeader(title: "Details")) {
-                TextField("Name", text: $name)
+                TextField("Name", text: $name).textFieldStyle(PTTextFieldStyle())
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(PTColors.surface)
         .onAppear { name = classroom.name }
         .navigationTitle("Classroom")
         .toolbar {
@@ -211,13 +220,18 @@ struct CreateStudentSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section(header: PTSectionHeader(title: "Details")) {
-                    TextField("First name", text: $firstName)
-                    TextField("Last name", text: $lastName)
+            VStack(spacing: PTSpacing.m.rawValue) {
+                Text("New Student").font(PTTypography.title).foregroundStyle(PTColors.textPrimary)
+                HStack(spacing: PTSpacing.m.rawValue) {
+                    PTInput(placeholder: "First name", text: $firstName)
+                    PTInput(placeholder: "Last name", text: $lastName)
+                    PTAvatarSelector(emoji: .constant(""), imageData: .constant(nil))
                 }
+                .frame(maxWidth: 640)
+                Spacer(minLength: 0)
             }
-            .navigationTitle("New Student")
+            .scrollContentBackground(.hidden)
+            .background(PTColors.surface)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -248,11 +262,13 @@ struct StudentDetailView: View {
     var body: some View {
         Form {
             Section(header: PTSectionHeader(title: "Details")) {
-                TextField("First name", text: $firstName)
-                TextField("Last name", text: $lastName)
+                TextField("First name", text: $firstName).textFieldStyle(PTTextFieldStyle())
+                TextField("Last name", text: $lastName).textFieldStyle(PTTextFieldStyle())
                 TextField("Notes", text: $notes, axis: .vertical)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(PTColors.surface)
         .onAppear {
             firstName = student.firstName
             lastName = student.lastName
@@ -322,8 +338,8 @@ struct GuideDetailView: View {
     var body: some View {
         Form {
             Section(header: PTSectionHeader(title: "Profile")) {
-                TextField("Full name", text: $fullName)
-                TextField("Email", text: $email)
+                TextField("Full name", text: $fullName).textFieldStyle(PTTextFieldStyle())
+                TextField("Email", text: $email).textFieldStyle(PTTextFieldStyle())
             }
             Section(header: PTSectionHeader(title: "Role")) {
                 Picker("Role", selection: $role) {
@@ -333,6 +349,8 @@ struct GuideDetailView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(PTColors.surface)
         .onAppear {
             fullName = guide.fullName
             email = guide.email ?? ""
@@ -400,6 +418,135 @@ struct AISettingsView: View {
         }
         .onAppear { apiKey = config.openAIAPIKey() ?? "" }
         .navigationTitle("AI Settings")
+    }
+}
+
+struct DeveloperToolsView: View {
+    @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var appVM: AppViewModel
+    private let config: ConfigServiceProtocol = ConfigService()
+
+    var body: some View {
+        Form {
+            Section(header: PTSectionHeader(title: "Data")) {
+                Button("Reset (clear data and return to Sign In)") {
+                    // Full purge: clear stored Apple ID and delete all SwiftData entities
+                    Keychain.shared.remove(forKey: "appleUserId")
+
+                    // Delete content in dependency order
+                    let deleteAll: [(any PersistentModel.Type)] = [
+                        StudentObservation.self,
+                        HabitLog.self,
+                        Habit.self,
+                        Lesson.self,
+                        TaskItem.self,
+                        ParentContact.self,
+                        Membership.self,
+                        Invite.self,
+                        Classroom.self,
+                        Student.self,
+                        Organization.self,
+                        Guide.self
+                    ]
+
+                    for model in deleteAll {
+                        if model == StudentObservation.self {
+                            if let all = try? modelContext.fetch(FetchDescriptor<StudentObservation>()) {
+                                for obj in all { modelContext.delete(obj) }
+                            }
+                        } else if model == HabitLog.self {
+                            if let all = try? modelContext.fetch(FetchDescriptor<HabitLog>()) {
+                                for obj in all { modelContext.delete(obj) }
+                            }
+                        } else if model == Habit.self {
+                            if let all = try? modelContext.fetch(FetchDescriptor<Habit>()) {
+                                for obj in all { modelContext.delete(obj) }
+                            }
+                        } else if model == Lesson.self {
+                            if let all = try? modelContext.fetch(FetchDescriptor<Lesson>()) {
+                                for obj in all { modelContext.delete(obj) }
+                            }
+                        } else if model == TaskItem.self {
+                            if let all = try? modelContext.fetch(FetchDescriptor<TaskItem>()) {
+                                for obj in all { modelContext.delete(obj) }
+                            }
+                        } else if model == ParentContact.self {
+                            if let all = try? modelContext.fetch(FetchDescriptor<ParentContact>()) {
+                                for obj in all { modelContext.delete(obj) }
+                            }
+                        } else if model == Membership.self {
+                            if let all = try? modelContext.fetch(FetchDescriptor<Membership>()) {
+                                for obj in all { modelContext.delete(obj) }
+                            }
+                        } else if model == Invite.self {
+                            if let all = try? modelContext.fetch(FetchDescriptor<Invite>()) {
+                                for obj in all { modelContext.delete(obj) }
+                            }
+                        } else if model == Classroom.self {
+                            if let all = try? modelContext.fetch(FetchDescriptor<Classroom>()) {
+                                for obj in all { modelContext.delete(obj) }
+                            }
+                        } else if model == Student.self {
+                            if let all = try? modelContext.fetch(FetchDescriptor<Student>()) {
+                                for obj in all { modelContext.delete(obj) }
+                            }
+                        } else if model == Organization.self {
+                            if let all = try? modelContext.fetch(FetchDescriptor<Organization>()) {
+                                for obj in all { modelContext.delete(obj) }
+                            }
+                        } else if model == Guide.self {
+                            if let all = try? modelContext.fetch(FetchDescriptor<Guide>()) {
+                                for obj in all { modelContext.delete(obj) }
+                            }
+                        }
+                    }
+                    try? modelContext.save()
+
+                    // Route to Sign In
+                    appVM.signOut()
+                }.ptSecondary()
+
+                Button("Load Demo Data") {
+                    if let guide = appVM.currentGuide {
+                        // Minimal in-place seeding: create demo org, class, students, and sample items
+                        let org = Organization(name: "Demo School")
+                        modelContext.insert(org)
+                        _ = Membership(orgId: org.id, guideId: guide.id, role: .superAdmin)
+                        let classroom = Classroom(name: "Demo Classroom")
+                        classroom.orgId = org.id
+                        modelContext.insert(classroom)
+                        guide.defaultClassroomId = classroom.id
+                        try? modelContext.save()
+
+                        let names = [("Ava","M"),("Leo","S"),("Maya","K"),("Owen","R")]
+                        var students: [Student] = []
+                        for (f,l) in names {
+                            let s = Student(firstName: f, lastName: l)
+                            s.orgId = org.id
+                            modelContext.insert(s)
+                            students.append(s)
+                            classroom.studentIds.append(s.id)
+                        }
+                        try? modelContext.save()
+
+                        let obs = ObservationService()
+                        let lessons = LessonService()
+                        let tasks = TaskService()
+                        let habits = HabitService()
+                        for s in students {
+                            _ = try? obs.create(primaryStudentId: s.id, content: "Focused on math materials for 20 minutes.", taggedStudentIds: [], subjectTag: "Math", materialTag: "Beads", appTag: nil, createdByGuideId: guide.id, context: modelContext)
+                            _ = try? lessons.create(studentId: s.id, title: "Intro to Movable Alphabet", details: nil, scheduledFor: Date().addingTimeInterval(86400), guideId: guide.id, context: modelContext)
+                            _ = try? tasks.create(studentId: s.id, title: "Prepare work tray", details: nil, scheduledFor: nil, guideId: guide.id, context: modelContext)
+                            _ = try? habits.create(studentId: s.id, name: "Attendance", cadence: .daily, createdByGuideId: guide.id, context: modelContext)
+                        }
+                        try? modelContext.save()
+                    }
+                }.ptPrimary()
+            }
+        }
+        .navigationTitle("Developer Tools")
+        .scrollContentBackground(.hidden)
+        .background(PTColors.surface)
     }
 }
 

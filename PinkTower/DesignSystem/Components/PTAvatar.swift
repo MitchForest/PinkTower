@@ -33,4 +33,24 @@ struct PTAvatar: View {
     }
 }
 
+enum PTAvatarPreset {
+    case xs, s, m, l, xl
+
+    var value: CGFloat {
+        switch self {
+        case .xs: return 28
+        case .s: return 40
+        case .m: return 56
+        case .l: return 72
+        case .xl: return 96
+        }
+    }
+}
+
+extension PTAvatar {
+    init(image: Image? = nil, preset: PTAvatarPreset, initials: String = "") {
+        self.init(image: image, size: preset.value, initials: initials)
+    }
+}
+
 

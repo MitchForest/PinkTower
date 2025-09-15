@@ -16,9 +16,9 @@ struct PTAppleSignInButton: View {
             )
             .overlay(
                 HStack(spacing: 8) {
-                    Image(systemName: "apple.logo").font(.system(size: 18, weight: .semibold))
+                    Image(systemName: "apple.logo").font(.system(size: PTIconSize.small.rawValue, weight: .semibold))
                     Text("Sign in with Apple")
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .font(PTTypography.subtitle)
                 }
                 .foregroundStyle(Color.white)
                 .allowsHitTesting(false)

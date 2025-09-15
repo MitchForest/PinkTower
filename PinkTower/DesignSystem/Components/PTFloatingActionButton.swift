@@ -7,7 +7,7 @@ struct PTFloatingActionButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 20, weight: .bold))
+                .font(.system(size: PTIconSize.medium.rawValue, weight: .bold))
                 .foregroundStyle(Color.white)
                 .padding(20)
                 .background(PTColors.accent)

@@ -9,6 +9,7 @@ struct ClassroomsView: View {
     private let classroomService: ClassroomServiceProtocol = ClassroomService()
 
     var body: some View {
+        PTScreen {
         FloatingActionButtonContainer(content: {
             if classrooms.isEmpty {
                 PTEmptyState(
@@ -37,10 +38,10 @@ struct ClassroomsView: View {
                 .listStyle(.insetGrouped)
             }
         }, button: PTFloatingActionButton(systemImage: "plus", action: { showCreate = true }))
+        }
         .sheet(isPresented: $showCreate) { CreateClassroomView(onCreated: { id in
             appVM.selectedClassroomId = id
         })}
-        .background(PTColors.surface)
     }
 
     private func select(_ room: Classroom) {

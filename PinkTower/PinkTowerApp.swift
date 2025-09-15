@@ -25,6 +25,7 @@ struct PinkTowerApp: App {
             Lesson.self,
             TaskItem.self,
             ParentContact.self,
+            ParentSummaryLog.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

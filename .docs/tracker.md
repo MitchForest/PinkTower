@@ -330,3 +330,149 @@ Checklist (UI/UX only)
 Notes
 - Keep session scope UI‑only; underlying Services already exist from Sessions 1–2 (Org/Memberships/Invites/Classrooms/Students). Minor routing changes will be needed but no data model changes.
 - Visual inspiration: minimal, organic shapes; soft neutral backgrounds; friendly rounded buttons; calm micro‑motion.
+
+#### Session 4 — Classroom, Students UI/UX Systemization (2025-09-15)
+
+Goal: Establish a consistent, reusable UI system for the classroom list, students grid/sheet, add-student flow, and global top navigation. Unify dialogs/sheets/dropdowns/inputs to the design system for 100% consistency (light, minimal, rounded, native-first), improve scalability for small/large classrooms, and clarify primary actions.
+
+Key decisions
+- Top navigation: remove opaque background; use a lightweight layout with larger touch targets. Title centered shows current classroom name with a down arrow. Tap opens native menu: switch classrooms and "Add classroom".
+- Leading icons: hamburger (future nav) then a large Search icon. Trailing: large Notifications and Avatar.
+- Students presentation: adaptive grid that scales avatar+name size with classroom size. 2–3 rows with large tiles for small classes; compact tiles for large (e.g., 48 students). Dynamic Type-aware.
+- Student interaction: tap opens a full-width native sheet (drawer) via `PTBottomSheet` with `.fraction(0.95)` and `.large` detents. This is quick-access; not a modal dialog.
+- Student sheet header: avatar, name, classroom, age; link to full profile screen.
+- Student sheet quick capture: prominent input with mic button and quick toggles for Observation/Lesson/Task.
+- Section stacks in sheet: Observations (last 3–5, newest first) with “See all”; Lessons; Tasks; Habits (large one-tap buttons to complete). Each has a link to the dedicated list in the full student page.
+- Consistency: All sheets, dropdowns, inputs, buttons, toasts use PT design system tokens/components. No ad-hoc styles.
+
+Design system updates
+- PTTopBarCapsule v2 → `PTNavBar`:
+  - No background fill by default (transparent) but supports an optional capsule style on scroll.
+  - Center title with caret; leading: hamburger, search; trailing: notifications, avatar. All icons 24–28pt tappable areas ≥44×44.
+  - Title tap shows native `Menu` with: classroom list (radio), "Add classroom".
+- PTBottomSheet: add `.fraction(0.95)` default; consistent grabber; keyboard-safe padding; optional header slot.
+- PTAvatar: responsive typography inside; sizes: xs=28, s=40, m=56, l=72, xl=96.
+- New: `PTGridTile` for student tiles (avatar + name) with size presets: `.large`, `.medium`, `.compact`.
+- New: `PTMenu` wrappers for native menus with DS styling hooks (icons, roles, separators).
+- Inputs/buttons: ensure `PTTextFieldStyle` and `PTButtonStyle` variants: primary, secondary, quiet. Use throughout.
+
+Screens and flows
+- Classroom switcher
+  - From the top center title: native `Menu` with list of classrooms and an "Add classroom" action.
+  - When only one classroom exists, still show name and caret; menu shows disabled “Only one classroom” + Add classroom.
+- ClassroomsView
+  - Keep list rows using `PTListCell`. Primary action: `PTFloatingActionButton` “+ Classroom”.
+  - Add top nav per `PTNavBar`. Selecting a classroom routes to Students tab.
+- Students (HomeroomView)
+  - Adaptive grid using `PTGridTile` with responsive sizing:
+    - 1–8 students: large tiles (avatar ~72–96, name title font)
+    - 9–24 students: medium tiles (avatar ~56–72)
+    - 25–60+ students: compact tiles (avatar ~40–56, two lines max)
+  - Tap → full-width sheet with `StudentPageView(student)`.
+  - Long-press context menu: Edit, Remove from class, Delete (role gated).
+  - Primary action: `PTFloatingActionButton` “+ Student”. Add-student uses consistent sheet layout.
+- Student Sheet (Quick workspace)
+  - Header: avatar, name, classroom, age, link to full profile.
+  - Quick Capture: segmented control Observation/Lesson/Task; multi-line input; mic circle; Save. One-tap after transcription.
+  - Sections: Observations (3–5 newest with See All), Lessons (3–5), Tasks (3–5), Habits (large buttons to mark today complete). Each has a link to the dedicated list in the full student page.
+  - Bottom safe inset; dismiss via swipe or grabber.
+- Student Full Page
+  - Remains `StudentPageView` standalone route with complete lists, filters, analytics, AI.
+
+Component inventory to implement/update
+- New: `PTNavBar` (replaces usage of `PTTopBarCapsule` where appropriate)
+- Update: `PTBottomSheet` (detents, keyboard safe, header slot)
+- New: `PTGridTile` (student tile)
+- Update: `PTAvatar` sizing presets
+- Update: `PTButtonStyle` variants (primary/secondary/quiet)
+- Update: `PTTextFieldStyle` consistency for all inputs (including search)
+- New: `PTMenu` helper for classroom switcher
+
+Acceptance criteria
+- Top bar shows classroom name centered with caret; tapping shows a native menu listing classrooms (with current checked) and an "Add classroom" item.
+- Leading icons: hamburger and enlarged search; trailing icons: enlarged notifications and avatar. Tap targets ≥44×44.
+- Students grid adapts tile sizes based on count thresholds; accommodates up to 60+ students without crowding.
+- Tapping a student presents a full-width sheet at ~95% height with grabber; the sheet shows header, quick capture (with mic), then Observations/Lessons/Tasks/Habits sections, each with recent items and See All.
+- All dialogs, sheets, dropdowns, inputs, and buttons use the design system tokens and components; visual style is light, minimal, and rounded.
+- Add student uses a consistent sheet style (not alert-style modal).
+
+Checklist
+- [x] Create `PTNavBar` component with center title + classroom switcher menu and enlarged icons
+- [x] Replace top bar usage on major screens (`MainTabView`) [note: `SettingsView`, `SearchView` keep native titles for now]
+- [x] Enhance `PTBottomSheet` with `.fraction(0.95)`
+- [x] Implement `PTGridTile` and integrate into `HomeroomView` with adaptive sizing
+- [x] Add `PTAvatar` size presets and update usage across views
+- [x] Standardize `PTButton` variants and apply across dialogs/sheets
+- [x] Enforce `PTTextFieldStyle` across inputs (search/capture forms) where applicable
+- [x] Implement classroom switcher menu (native `Menu`) from navbar title with "Add classroom"
+- [x] Update add-student flow to use standardized sheet and inputs (kept as form sheet)
+- [ ] QA for Dynamic Type, VoiceOver labels, and 44×44 tap targets
+
+Notes
+- Keep native-first where possible (Menu, sheets). Maintain separation: Views ↔ ViewModels ↔ Services.
+- Use `PermissionService` for role-gated actions.
+- Future: navbar scroll behavior (fade-in capsule), class cover image, attendance density controls, integrate `PTNavBar` into `SettingsView`/`SearchView` if we decide to unify all screens.
+
+#### Session 5 — DS Defaults + UX Consistency Fixes (2025-09-15)
+
+Goal: Enforce 100% design‑system defaults across the app (menus, sheets, forms, actions), fix navigation layering/spacing issues, align all create/edit flows with DS, and adopt a robust native drawer for student quick workspace. Zero “black” default UIs; everything uses our tokens and components.
+
+User‑reported issues to address
+- Students grid underlaps top bar: avatars appear beneath the navbar; magnifying glass overlaps tiles.
+- Classroom switcher menu renders as black; “Add classroom” route goes to an all‑black screen.
+- New student CTA presents an all‑black screen.
+- Long‑press context menu (edit/delete) is black.
+- Student tap should open a native iOS drawer; current behavior feels off.
+- Student full profile shows a system back button under/overlapping the hamburger; back should be integrated into the top bar on the left.
+
+Key decisions
+- Navigation layering
+  - Use a single global top bar (`PTNavBar`) for top‑level screens only. For detail screens (e.g., full student profile), swap to a `PTNavBar` variant with an integrated back button on the left (replaces hamburger) to avoid overlap with the system nav bar.
+  - Introduce a simple “detail mode” flag in the shell to toggle the navbar variant and spacing.
+- Safe‑area and spacing
+  - Create `PTScreen` container to standardize background and safe‑area handling and to provide a consistent top content inset matching `PTNavBar` height. Adopt across screens to prevent underlap.
+- Menus and context actions
+  - Replace `.contextMenu` long‑press with a DS‑styled action surface: either `PTMenu` (native `Menu` with DS hooks) or a `PTActionSheet` implemented via `PTBottomSheet` for full control. Prefer the sheet for destructive/primary actions.
+  - Replace the classroom switcher `Menu` with a DS‑styled `PTMenu` or a small `PTBottomSheet` that lists classrooms with a radio control and “Add classroom”.
+- Sheets and forms
+  - Standardize sheets with `PTBottomSheet` (default `.fraction(0.95)` + `.large`) and a header slot. Ensure consistent backgrounds via the content view (no black defaults).
+  - Introduce a form styling helper: hide default form backgrounds (`.scrollContentBackground(.hidden)`) and set `.background(PTColors.surface)`; ensure all form inputs use `PTTextFieldStyle` and buttons use `PTButton` styles.
+- Student drawer
+  - Use the item‑based `PTBottomSheet` for `StudentPageView` (compact mode) with a proper header (avatar, name, class) and keyboard‑safe padding. Ensure instant content readiness and consistent detents.
+- Tokens and motion
+  - Add `PTIconSize` tokens (e.g., small=18, medium=24, large=28) and replace inline icon sizes.
+  - Add `PTMotion` tokens (easing + durations + springs) and replace inline springs.
+- Cleanup
+  - Remove `MainTabView` and `PTTopBarCapsule` to avoid drift.
+
+Deliverables
+- New/updated DS primitives: `PTScreen`, `PTMenu`, `PTActionSheet` (via `PTBottomSheet`), `PTMotion`, `PTIconSize`.
+- Navbar variant with integrated back; shell support for detail mode.
+- Classroom switcher implemented as DS menu/sheet.
+- All create/edit forms (Add Classroom, New Student) shown in DS sheet with DS fields and buttons (no black background).
+- Homeroom grid spacing fixed so content never underlaps the navbar.
+
+Acceptance criteria
+- Students grid shows below the top bar with adequate spacing; no overlap of icons over tiles.
+- Classroom title tap opens a DS‑styled classroom switcher (menu or sheet) matching our colors/typography; background is not black.
+- “Add classroom” and “New student” open DS‑styled sheets with `PTTextFieldStyle` inputs and `PTButton` actions; no black screens.
+- Long‑press on a student shows DS‑consistent actions (sheet or styled menu), not a black context menu.
+- Tapping a student opens a native bottom drawer (sheet at ~95% height) with a header and sections; no blank first render or layout jumps.
+- Navigating to the full student profile presents a top bar with an integrated back button on the left (no overlapping with hamburger/system back).
+- All forms and sheets have consistent background and spacing using `PTScreen` and DS tokens.
+
+Checklist
+- [ ] Implement `PTScreen` container and adopt on top‑level and detail screens.
+- [ ] Add `PTMenu` and/or `PTActionSheet` and replace `.contextMenu` usages.
+- [ ] Update classroom switcher to use DS menu/sheet with radio selection + “Add classroom”.
+- [ ] Standardize forms: apply `.scrollContentBackground(.hidden)` and DS background; ensure `PTTextFieldStyle` across all form inputs.
+- [ ] Convert Add Classroom and New Student to DS sheets using `PTBottomSheet` and DS components.
+- [ ] Fix Homeroom content inset so tiles never underlaps the navbar (via `PTScreen`).
+- [ ] Create `PTNavBar` back variant and integrate with shell detail mode.
+- [ ] Introduce `PTIconSize` and `PTMotion`; replace inline icon sizes and springs.
+- [ ] Remove `MainTabView` and `PTTopBarCapsule` (migrate remaining references if any).
+- [ ] QA: light/dark, Dynamic Type, VoiceOver, 44×44 tap targets, and sheet/menu accessibility.
+
+Notes
+- We’ll keep native patterns (Menu, sheets) where they meet our visual goals; otherwise we’ll route actions through DS‑styled sheets for consistent backgrounds and spacing.
+- No backend changes; all UX/style only. Ensure changes do not regress routing or permissions.

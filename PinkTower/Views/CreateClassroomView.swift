@@ -12,9 +12,11 @@ struct CreateClassroomView: View {
         NavigationStack {
             Form {
                 Section(header: PTSectionHeader(title: "Details")) {
-                    TextField("Classroom name", text: $name)
+                    TextField("Classroom name", text: $name).textFieldStyle(PTTextFieldStyle())
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(PTColors.surface)
             .navigationTitle("Create classroom")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

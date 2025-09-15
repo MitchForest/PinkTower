@@ -30,3 +30,34 @@ extension Button {
 }
 
 
+struct PTButtonSecondaryStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.vertical, PTSpacing.m.rawValue)
+            .padding(.horizontal, PTSpacing.xl.rawValue)
+            .background(PTColors.surfaceSecondary)
+            .foregroundStyle(PTColors.textPrimary)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(PTColors.border, lineWidth: 1))
+            .opacity(configuration.isPressed ? 0.95 : 1.0)
+    }
+}
+
+struct PTButtonQuietStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.vertical, PTSpacing.s.rawValue)
+            .padding(.horizontal, PTSpacing.l.rawValue)
+            .foregroundStyle(PTColors.accent)
+            .background(Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .opacity(configuration.isPressed ? 0.8 : 1.0)
+    }
+}
+
+extension Button {
+    func ptSecondary() -> some View { self.buttonStyle(PTButtonSecondaryStyle()) }
+    func ptQuiet() -> some View { self.buttonStyle(PTButtonQuietStyle()) }
+}
+
+

@@ -21,7 +21,7 @@ struct AppRootView: View {
                 OnboardingWizardView()
                     .environmentObject(appVM)
             case .main:
-                MainTabView()
+                MainShellView()
                     .environmentObject(appVM)
             }
         }

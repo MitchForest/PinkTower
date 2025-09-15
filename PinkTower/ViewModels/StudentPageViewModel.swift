@@ -15,6 +15,8 @@ final class StudentPageViewModel: ObservableObject {
     @Published var quickText: String = ""
 
     @Published var habits: [Habit] = []
+    @Published var habitLogs: [UUID: [Date: Bool]] = [:] // habitId -> day -> done
+    @Published var weekDays: [Date] = [] // Mon..Sun (but we will show Mon-Fri per UI)
     @Published var observations: [StudentObservation] = []
     @Published var lessons: [Lesson] = []
     @Published var tasks: [TaskItem] = []
@@ -60,9 +62,40 @@ final class StudentPageViewModel: ObservableObject {
             observations = try observationService.list(ObservationQuery(studentId: student.id), context: context)
             lessons = try lessonService.list(for: student.id, context: context)
             tasks = try taskService.list(for: student.id, context: context)
+            computeCurrentWeek()
+            try loadHabitLogs(context: context)
         } catch {
             errorMessage = "Failed to load data"
         }
+    }
+
+    private func computeCurrentWeek(reference: Date = Date()) {
+        var calendar = Calendar.current
+        calendar.firstWeekday = 2 // Monday
+        let startOfWeek: Date
+        if let weekInterval = calendar.dateInterval(of: .weekOfYear, for: reference) {
+            // Start on Monday explicitly
+            let weekday = calendar.component(.weekday, from: weekInterval.start)
+            let offset = (weekday == 2) ? 0 : ((weekday + 5) % 7) // map to Monday start
+            startOfWeek = calendar.date(byAdding: .day, value: offset, to: weekInterval.start) ?? weekInterval.start
+        } else {
+            startOfWeek = calendar.startOfDay(for: reference)
+        }
+        weekDays = (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: startOfWeek) }
+    }
+
+    private func loadHabitLogs(context: ModelContext) throws {
+        guard !habits.isEmpty else { habitLogs = [:]; return }
+        let habitIds = habits.map { $0.id }
+        guard let first = weekDays.first, let last = weekDays.last else { return }
+        let logs = try habitService.logs(for: habitIds, in: first...last, context: context)
+        var dict: [UUID: [Date: Bool]] = [:]
+        for log in logs {
+            var inner = dict[log.habitId] ?? [:]
+            inner[log.date] = log.isDone
+            dict[log.habitId] = inner
+        }
+        habitLogs = dict
     }
 
     func refreshObservations(context: ModelContext) {
@@ -109,7 +142,8 @@ final class StudentPageViewModel: ObservableObject {
 
     func toggleRecording() {
         if recorder.isRecording {
-            _ = recorder.stop()
+            // On stop, automatically transcribe and append to quick text
+            Task { await transcribeLatestRecording() }
         } else {
             try? recorder.start()
         }
@@ -140,6 +174,27 @@ final class StudentPageViewModel: ObservableObject {
     func toggleHabitToday(_ habit: Habit, guide: Guide?, context: ModelContext) {
         guard let guide = guide else { return }
         _ = try? habitService.toggleToday(habit: habit, guideId: guide.id, context: context)
+    }
+
+    func toggleHabit(_ habit: Habit, on day: Date, guide: Guide?, context: ModelContext) {
+        guard let guide = guide else { return }
+        if let log = try? habitService.toggle(habit, on: day, guideId: guide.id, context: context) {
+            var inner = habitLogs[habit.id] ?? [:]
+            inner[log.date] = log.isDone
+            habitLogs[habit.id] = inner
+            Haptics.lightTap()
+        }
+    }
+
+    func addHabit(name: String, cadence: HabitCadence = .daily, guide: Guide?, context: ModelContext) {
+        guard let guide = guide, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        if let new = try? habitService.create(studentId: student.id, name: name, cadence: cadence, createdByGuideId: guide.id, context: context) {
+            habits.append(new)
+        }
+    }
+
+    func popularHabits(context: ModelContext) -> [String] {
+        (try? habitService.popularHabitNames(context: context)) ?? []
     }
 
     func setLesson(_ lesson: Lesson, completed: Bool, guide: Guide?, context: ModelContext) {
